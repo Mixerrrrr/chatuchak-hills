@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Interactive prototype: F1 cars loop through Chatuchak Park while hill heights change sightlines and rain drains into the ponds.">
 <style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Chatuchak Circuit Hills</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -60,7 +59,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-
 .hill input[type=range]{width:100%;margin:2px 0;accent-color:var(--c);height:28px}
 .meter{height:9px;border-radius:5px;background:#EDE3CC;border:1.5px solid var(--ink);overflow:hidden}
 .meter i{display:block;height:100%;background:var(--c);transition:width .25s}
-.stats{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:13px;color:var(--ink-soft)}
+.stats{display:flex;flex-wrap:wrap;align-items:center;gap:2px 14px;font-size:13px;color:var(--ink-soft)}
 .stats b{color:var(--ink);font-variant-numeric:tabular-nums}
 .rows{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
 .rows li{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;padding:6px 0;border-top:1px dashed var(--line)}
@@ -69,6 +68,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-
 .chip{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
 .chip.ok{color:var(--ok);background:#E6F2E2}
 .chip.bad{color:var(--bad);background:#FBE5E0}
+.chip.mid{color:var(--ink-soft);background:#F1E8D3}
 .check{display:flex;align-items:center;gap:10px;min-height:36px;font-size:14.5px;cursor:pointer}
 .check input{width:20px;height:20px;accent-color:var(--wood)}
 .foot{margin:0;font-size:12.5px;color:var(--ink-soft);padding-inline:4px}
@@ -82,13 +82,18 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-
 <div class="app">
   <main class="board">
     <div class="frame">
-      <canvas id="scene" role="img" aria-label="Animated park map traced from the plan: an F1 track along the rail edge of Chatuchak Park, four hills joined by bridges over the track, a memorial cut into Hill A, existing ponds and trees"></canvas>
+      <canvas id="scene" role="img" aria-label="Animated park map traced from the plan: an F1 track along the rail edge of Chatuchak Park. At each turn a rippled landform rises from the track edge, starting with a sharp stone edge and smoothing out. Flat event spaces with screens sit on the opposite side, bridges link the crests, and balloons mark the walking route."></canvas>
     </div>
     <div class="legend">
-      <span><i style="background:#E8833A"></i><i style="background:#4F8FCB"></i><i style="background:#B565A7"></i><i style="background:#3FA27A"></i> Stripes on the track = what each hill can see</span>
-      <span><i style="background:#E9D3A6"></i> Bridge between hilltops</span>
-      <span><i style="background:#2B2B30"></i> Memorial walls</span>
-      <span><i style="background:#5C9FD1"></i> Rainwater running downhill</span>
+      <span><i style="background:#9CC86A"></i> Wave landform (contours every 0.4 m)</span>
+      <span><i style="background:#5E5A57"></i> Stone edge</span>
+      <span><i style="background:#E0583D"></i> Grandstand (race week)</span>
+      <span><i style="background:#26303A"></i> Big screen</span>
+      <span><i style="background:#C8322B"></i> Ticket fence</span>
+      <span><i style="background:#2F5FA8"></i> Step-free route</span>
+      <span><i style="background:#E9D3A6"></i> Bridge</span>
+      <span><i style="background:#E8833A"></i><i style="background:#4F8FCB"></i> Stripes = what each wave can see</span>
+      <span><i style="background:#5C9FD1"></i> Rainwater</span>
     </div>
   </main>
 
@@ -96,8 +101,22 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-
     <header>
       <p class="eyebrow">Chatuchak Park · east edge, along the rail</p>
       <h1>Grand Prix: City, Circuit, Civic</h1>
-      <p class="tag">Raise a hill. See the race. Catch the rain.</p>
+      <p class="tag">The cars shape the ground. The ground holds the crowd and the rain.</p>
     </header>
+
+    <section class="card" aria-labelledby="ev-h">
+      <h2 id="ev-h">Day</h2>
+      <div class="seg" role="group" aria-label="Day">
+        <button type="button" id="btn-race" aria-pressed="true">Race day</button>
+        <button type="button" id="btn-park" aria-pressed="false">Park day</button>
+      </div>
+      <p class="hint" id="ev-hint"></p>
+      <ul class="rows" id="capacity">
+        <li><span>On the waves · general admission, standing</span><b id="cap-ga"></b></li>
+        <li><span>In the grandstands · reserved seats</span><b id="cap-gs"></b></li>
+        <li><span><b>Total spectators</b></span><b id="cap-all"></b></li>
+      </ul>
+    </section>
 
     <section class="card" aria-labelledby="season-h">
       <h2 id="season-h">Season</h2>
@@ -106,33 +125,28 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-
         <button type="button" id="btn-wet" aria-pressed="false">Rainy season</button>
       </div>
       <p class="hint" id="season-hint">The ponds are dry (0%): empty basins, waiting for the next rain.</p>
-      <div class="water" id="water" hidden><span>Rain caught by the ponds</span><b><span id="water-val">0</span> m³</b></div>
+      <div class="water" id="water" hidden><span>Rain caught by ponds and edge drains</span><b><span id="water-val">0</span> m³</b></div>
     </section>
 
     <section class="card" aria-labelledby="hills-h">
-      <h2 id="hills-h">Hills</h2>
-      <p class="hint">A taller hill sees more of the track, but needs more soil. Tap a hill to show its sightlines.</p>
+      <h2 id="hills-h">Waves at the turns</h2>
+      <p class="hint">Each wave starts at the track edge and rises away from it. Ripples are tighter where the cars are slower, so the braking zones get the most seats. Tap a wave to show its sightlines.</p>
       <div class="hills" id="hills"></div>
-    </section>
-
-    <section class="card" aria-labelledby="mem-h">
-      <h2 id="mem-h">Memorial on Hill A</h2>
-      <p class="hint" id="mem-text"></p>
-      <div class="stats"><span>Turn in view from the memorial floor: <b id="mem-see"></b></span><span>Deepest wall: <b id="mem-wall"></b></span></div>
     </section>
 
     <section class="card" aria-labelledby="br-h">
       <h2 id="br-h">Bridges</h2>
-      <p class="hint">Each bridge runs hilltop to hilltop and crosses the track. It needs at least 5 m clear above the cars.</p>
+      <p class="hint">Bridges run crest to crest over the track. They need at least 5 m clear above the cars.</p>
       <ul class="rows" id="bridges"></ul>
     </section>
 
     <section class="card" aria-label="View options">
       <label class="check"><input type="checkbox" id="chk-trees" checked> Show trees (canopy 12–20 m tall)</label>
-      <label class="check"><input type="checkbox" id="chk-sight" checked> Show what each hill can see</label>
+      <label class="check"><input type="checkbox" id="chk-sight" checked> Show what each wave can see</label>
+      <label class="check"><input type="checkbox" id="chk-sound" checked> Show sound waves from the cars</label>
     </section>
 
-    <p class="foot">Prototype traced from the plan (≈ 0.75 m per plan pixel), north to the right. Cars are assumed to run from the south end northwards. Speeds come from a simple F1 model (3 g cornering, 4.6 g braking). Sightlines start at eye level, 1.6 m above the hilltop, and are blocked by other hills and tree canopy. Ponds are the existing ones next to the hills; the long channel along the rail is left out for now because the track crosses it. Soil and water figures are illustrative.</p>
+    <p class="foot">Prototype traced from the plan (≈ 0.75 m per plan pixel), north to the right. Cars run south to north; speeds come from a simple F1 model (3 g cornering, 4.6 g braking). Default heights scale with how hard the cars brake into each turn. Seating slope 1:3, back slope 1:2. Ripple spacing = 2.5 m + 0.12 × car speed (m/s). Sightlines start at eye level, 1.6 m above the ground, and are blocked by terrain, the crest barrier and tree canopy. Standing capacity assumes 2 people per m² on the track side of each crest; grandstands are 14 rows, 0.5 m per seat. The step-free route never gets steeper than 1:12 and crosses the track by underpass. Soil, water and capacity figures are illustrative.</p>
   </aside>
 </div>
 
@@ -140,40 +154,33 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-
 (function(){
 "use strict";
 /* ---------------- config: world in metres, traced from the plan (north = +x) ---------------- */
-var W = 800, H = 420, CELL = 2, K = 0.9, ROAD_Y = 350;
+var W = 800, H = 420, CELL = 2, ROAD_Y = 350, RES = 1.5;
 var CFG = {
-  eye: 1.6, viewDist: 500, trackWidth: 12, minClear: 5,
+  eye: 1.6, viewDist: 500, gaDensity: 2, trackWidth: 12, edge: 8, minClear: 5, barrierH: 2.4,
   speed: { vmax: 90, lat: 30, brake: 45, accel: 11, start: 70 },
-  mounds: [
-    { id:"A", x:191, y:170, r:52, bump:0.07, rot:0.3, h:12, color:"#E8833A" },
-    { id:"B", x:337, y:214, r:34, bump:0.07, rot:1.1, h:7,  color:"#4F8FCB" },
-    { id:"C", x:457, y:154, r:45, bump:0.07, rot:0.2, h:9,  color:"#B565A7" },
-    { id:"D", x:532, y:255, r:30, bump:0.07, rot:0.8, h:7,  color:"#3FA27A" }
-  ],
+  wave: { lenIn: 40, lenOut: 95, rise: 3, back: 2, stepMax: 1.8, amp: 0.45, maxH: 15 },
   ponds: [
-    { x:690, y:52,  a:100, b:78, depth:1.5, base:0.55 },
-    { x:555, y:139, a:44,  b:21, depth:1.2, base:0.4 },
-    { x:274, y:304, a:76,  b:24, depth:1.2, base:0.4 },
-    { x:397, y:97,  a:28,  b:14, depth:1.0, base:0.4 },
-    { x:225, y:101, a:20,  b:12, depth:1.0, base:0.4 },
-    { x:44,  y:165, a:22,  b:16, depth:1.0, base:0.4 }
+    { x:690, y:52,  a:100, b:78, depth:1.5 },
+    { x:555, y:139, a:44,  b:21, depth:1.2 },
+    { x:274, y:304, a:76,  b:24, depth:1.2 },
+    { x:397, y:97,  a:28,  b:14, depth:1.0 },
+    { x:225, y:101, a:20,  b:12, depth:1.0 },
+    { x:44,  y:165, a:22,  b:16, depth:1.0 }
   ],
   track: [[-260,97],[-160,157],[-80,205],[-22.5,240],[15,262.5],[60,288.75],[105,311.25],[144,330],[165,311.25],[198.75,277.5],[232.5,232.5],[262.5,195],[300,168.75],[337.5,157.5],[371.25,161.25],[393.75,180],[416.25,206.25],[446.25,226.5],[483.75,231],[510,216],[540,201],[566.25,206.25],[600,240],[637.5,266.25],[675,271.5],[708.75,264],[735,240],[765,180],[795,105],[828.75,26.25],[800,-60],[760,-200]],
-  bridges: [[0,1],[1,2],[2,3]],
-  memorial: { hill: 0, apexAt: 0.72, spreadDeg: 62.5, depth: 1.2 },
-  trees: { tries: 9000, max: 175, seed: 7 }
+  trees: { tries: 9000, max: 170, seed: 7 }
 };
+var COLORS = ["#E8833A","#4F8FCB","#B565A7","#3FA27A","#C9962A","#5C6BC0","#C2507A"];
 var INK = "#4A3A2C", PAPER = "#FFF8E8";
 var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function clamp(v,a,b){ return v < a ? a : v > b ? b : v; }
+function sstep(a,b,x){ var t = clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); }
 function hexRgb(h){ var n = parseInt(h.slice(1),16); return [n>>16 & 255, n>>8 & 255, n & 255]; }
-function mix(a,b,t){ var A = hexRgb(a), B = hexRgb(b); return "rgb(" + Math.round(A[0]+(B[0]-A[0])*t) + "," + Math.round(A[1]+(B[1]-A[1])*t) + "," + Math.round(A[2]+(B[2]-A[2])*t) + ")"; }
 function fmtH(h){ return (h % 1 ? h.toFixed(1) : String(h)); }
 function fmtN(n){ return Math.round(n).toLocaleString("en-US"); }
 function angDiff(a,b){ var d = a - b; while (d > Math.PI) d -= 2*Math.PI; while (d < -Math.PI) d += 2*Math.PI; return d; }
-function segDist(px,py,ax,ay,bx,by){ var dx = bx-ax, dy = by-ay, l2 = dx*dx+dy*dy, t = l2 ? clamp(((px-ax)*dx+(py-ay)*dy)/l2, 0, 1) : 0; return Math.hypot(px-ax-dx*t, py-ay-dy*t); }
 function inWorld(x,y,m){ m = m || 0; return x >= m && x <= W-m && y >= m && y <= H-m; }
 
 /* ---------------- track: spline, resampled every 1 m ---------------- */
@@ -203,7 +210,7 @@ var xs = [], ys = [], txs = [], tys = [], nx = [], ny = [], N = 0;
   }
 })();
 
-/* ---------------- speed model: cornering limit + braking/acceleration passes ---------------- */
+/* ---------------- speed model ---------------- */
 var vel = new Float32Array(N);
 (function(){
   var SP = CFG.speed, curv = new Float32Array(N), sm = new Float32Array(N);
@@ -218,7 +225,7 @@ var vel = new Float32Array(N);
   for (var d = N-2; d >= 0; d--) vel[d] = Math.min(vel[d], Math.sqrt(vel[d+1]*vel[d+1] + 2*SP.brake));
 })();
 
-/* ---------------- turns: speed minima with a real braking drop ---------------- */
+/* ---------------- turns ---------------- */
 var turns = [];
 (function(){
   var last = -999;
@@ -234,79 +241,152 @@ var turns = [];
   }
   turns.forEach(function(t, n){ t.name = "T" + (n+1); });
 })();
-var drama = turns.reduce(function(b, t){ return !b || t.drop > b.drop ? t : b; }, null) || { name:"–", x:CFG.mounds[0].x, y:CFG.mounds[0].y+90, vin:0, vmin:0, drop:0, idx:0, ox:0, oy:1 };
 var visIdx = [];
 for (var vi = 0; vi < N; vi += 4) if (inWorld(xs[vi], ys[vi])) visIdx.push(vi);
 turns.forEach(function(t){ t.samples = visIdx.filter(function(i){ return Math.hypot(xs[i]-t.x, ys[i]-t.y) < 30; }); });
 
-/* ---------------- hills, ponds, memorial geometry ---------------- */
-function rAt(m, th){ return m.r*(1 + m.bump*Math.cos(3*(th - m.rot))); }
-function moundUnit(m, x, y){ var dx = x-m.x, dy = y-m.y, d = Math.hypot(dx,dy)/rAt(m, Math.atan2(dy,dx)); return d < 1 ? Math.pow(1-d*d, 1.5) : 0; }
-function footD(m, x, y){ var dx = x-m.x, dy = y-m.y; return Math.hypot(dx,dy)/rAt(m, Math.atan2(dy,dx)); }
-function pondD(p, x, y){ return Math.hypot((x-p.x)/p.a, (y-p.y)/p.b); }
-
-var MEM = (function(){
-  var A = CFG.mounds[CFG.memorial.hill], th = Math.atan2(drama.y - A.y, drama.x - A.x), dx = Math.cos(th), dy = Math.sin(th);
-  var ra = rAt(A, th), ax = A.x + dx*ra*CFG.memorial.apexAt, ay = A.y + dy*ra*CFG.memorial.apexAt, sp = CFG.memorial.spreadDeg*Math.PI/180;
-  var wings = [th + sp, th - sp].map(function(w){
-    var wx = Math.cos(w), wy = Math.sin(w), len = 0;
-    while (len < A.r*3 && footD(A, ax + wx*len, ay + wy*len) < 1) len += 0.5;
-    return { wx:wx, wy:wy, len:len };
-  });
-  return { hill:CFG.memorial.hill, th:th, dx:dx, dy:dy, ax:ax, ay:ay, spread:sp, run:ra*(1 - CFG.memorial.apexAt), depth:CFG.memorial.depth, wings:wings, sees:false };
-})();
-function memFloor(x, y){
-  var rx = x - MEM.ax, ry = y - MEM.ay;
-  if (Math.hypot(rx, ry) > 0.01 && Math.abs(angDiff(Math.atan2(ry, rx), MEM.th)) > MEM.spread) return null;
-  var along = rx*MEM.dx + ry*MEM.dy;
-  return -MEM.depth*(1 - clamp(along/MEM.run, 0, 1));
-}
-
-/* ---------------- heightmap ---------------- */
+/* ---------------- grid: nearest track point for every cell ---------------- */
 var GW = W/CELL + 1, GH = H/CELL + 1, GN = GW*GH;
-var unit = CFG.mounds.map(function(){ return new Float32Array(GN); });
-var base = new Float32Array(GN), catchG = new Float32Array(GN), treeG = new Float32Array(GN), trackD = new Float32Array(GN), memF = new Float32Array(GN);
-var T = new Float32Array(GN), O = new Float32Array(GN), F = new Float32Array(GN);
-var memHill = CFG.mounds[MEM.hill];
-for (var gy = 0; gy < GH; gy++) for (var gx = 0; gx < GW; gx++){
-  var x = gx*CELL, y = gy*CELL, id = gy*GW + gx, bsum = 0, csum = 0;
-  CFG.mounds.forEach(function(m, mi){ unit[mi][id] = moundUnit(m, x, y); });
-  CFG.ponds.forEach(function(p){
-    var d = pondD(p, x, y); if (d < 1) bsum -= p.depth*(1 - d*d);
-    var dist = Math.hypot(x-p.x, y-p.y); csum -= 2.6*Math.exp(-dist*dist/(2*62*62));
-  });
-  base[id] = bsum; catchG[id] = csum; trackD[id] = 1e9;
-  var fl = footD(memHill, x, y) < 1.05 ? memFloor(x, y) : null;
-  memF[id] = fl === null ? NaN : fl;
-}
-for (var ti = 0; ti < N; ti += 2){
-  if (!inWorld(xs[ti], ys[ti], -30)) continue;
-  var cx = Math.round(xs[ti]/CELL), cy = Math.round(ys[ti]/CELL), R = 12;
-  for (var yy = cy-R; yy <= cy+R; yy++) for (var xx = cx-R; xx <= cx+R; xx++){
-    if (xx < 0 || yy < 0 || xx >= GW || yy >= GH) continue;
-    var dd = Math.hypot(xx*CELL - xs[ti], yy*CELL - ys[ti]), k2 = yy*GW + xx;
-    if (dd < trackD[k2]) trackD[k2] = dd;
+var nearI = new Int32Array(GN).fill(-1), nearD = new Float32Array(GN).fill(1e9), sideG = new Int8Array(GN);
+(function(){
+  var R = Math.ceil(110/CELL);
+  for (var i = 0; i < N; i += 2){
+    if (!inWorld(xs[i], ys[i], -110)) continue;
+    var cx = Math.round(xs[i]/CELL), cy = Math.round(ys[i]/CELL);
+    for (var yy = Math.max(0,cy-R); yy <= Math.min(GH-1,cy+R); yy++) for (var xx = Math.max(0,cx-R); xx <= Math.min(GW-1,cx+R); xx++){
+      var k = yy*GW + xx, dx = xx*CELL - xs[i], dy = yy*CELL - ys[i], dd = dx*dx + dy*dy;
+      if (dd < nearD[k]){ nearD[k] = dd; nearI[k] = i; }
+    }
   }
-}
+  for (var k2 = 0; k2 < GN; k2++){
+    if (nearI[k2] < 0) continue;
+    nearD[k2] = Math.sqrt(nearD[k2]);
+    var i2 = nearI[k2], x = (k2 % GW)*CELL, y = Math.floor(k2/GW)*CELL;
+    sideG[k2] = (nx[i2]*(x - xs[i2]) + ny[i2]*(y - ys[i2])) >= 0 ? 1 : -1;
+  }
+})();
 function sample(g, x, y){
   var fx = clamp(x/CELL, 0, GW-1.001), fy = clamp(y/CELL, 0, GH-1.001), ix = fx|0, iy = fy|0, ax = fx-ix, ay = fy-iy, i = iy*GW + ix;
   return (g[i]*(1-ax) + g[i+1]*ax)*(1-ay) + (g[i+GW]*(1-ax) + g[i+GW+1]*ax)*ay;
 }
+function nearestCell(x, y){ return clamp(Math.round(y/CELL),0,GH-1)*GW + clamp(Math.round(x/CELL),0,GW-1); }
 
-/* ---------------- trees (kept off the track, hills, ponds, road, bridges and the memorial's view) ---------------- */
+/* ---------------- waves: one per turn, on the side with room ---------------- */
+var waves = turns.map(function(t, k){
+  var a = t.idx, outS = (nx[a]*t.ox + ny[a]*t.oy) > 0 ? 1 : -1;
+  function room(sg){ var px = xs[a] + nx[a]*sg*(CFG.edge + 30), py = ys[a] + ny[a]*sg*(CFG.edge + 30); return py < ROAD_Y - 10 && inWorld(px, py, 4); }
+  var side = room(outS) ? outS : -outS;
+  var h = clamp(Math.round((3 + t.drop*0.13)*2)/2, 3, 12);
+  return { turn:t, name:t.name, a:a, side:side, h:h, color:COLORS[k % COLORS.length], vol:0, pct:0, turns:0, edgeH:0, leak:false, vis:new Uint8Array(N), cheer:false, flat:null };
+});
+function rangeOf(){ return CFG.wave.lenIn + CFG.wave.lenOut; }
+function waveH(w, k, Hm){
+  var i = nearI[k]; if (i < 0 || sideG[k] !== w.side || Hm <= 0.05) return 0;
+  var WV = CFG.wave, q = i - w.a; if (q < -WV.lenIn || q > WV.lenOut) return 0;
+  var u = (q + WV.lenIn)/rangeOf(), env = sstep(0, 0.06, u)*(1 - sstep(0.45, 1, u));
+  if (env <= 0) return 0;
+  var rise = Math.max(6, WV.rise*Hm), back = Math.max(5, WV.back*Hm), x0 = nearD[k] - CFG.edge;
+  if (x0 < 0 || x0 > rise + back) return 0;
+  var Hl = Hm*env, h; LAST.x0 = x0; LAST.rise = rise; LAST.env = env;
+  if (x0 <= rise){
+    var xx = x0/rise, pa = xx, ps = (1 - Math.cos(Math.PI*xx))/2, bl = Math.pow(u, 0.7), p = pa + (ps - pa)*bl;
+    var step = waveStep(u, Hm);
+    h = step + (Hl - step)*p;
+    var lam = clamp(2.5 + vel[i]*0.12, 3, 12);
+    h += WV.amp*Math.min(1, Hm/3)*env*Math.sin(2*Math.PI*x0/lam)*Math.sin(Math.PI*xx);
+  } else {
+    h = Hl*(1 + Math.cos(Math.PI*(x0 - rise)/back))/2;
+  }
+  return h > 0 ? h : 0;
+}
+var LAST = { x0:0, rise:0, env:0 };
+function waveStep(u, Hm){ return Math.min(Hm*0.5, CFG.wave.stepMax)*Math.pow(1 - u, 2)*sstep(0, 0.06, u); }
+function wavePoint(w, frac, dist){
+  var j = clamp(w.a + Math.round(-CFG.wave.lenIn + frac*rangeOf()), 0, N-1);
+  return { x: xs[j] + nx[j]*w.side*dist, y: ys[j] + ny[j]*w.side*dist, j:j };
+}
+function crestD(w){ return CFG.edge + Math.max(6, CFG.wave.rise*w.h); }
+function backD(w){ return crestD(w) + Math.max(5, CFG.wave.back*w.h); }
+
+/* flat event spaces: on the opposite side of each wave */
+function flatD(f, x, y){ var dx = x - f.x, dy = y - f.y, c = Math.cos(f.ang), s = Math.sin(f.ang); return Math.hypot((dx*c + dy*s)/f.a, (-dx*s + dy*c)/f.b); }
+waves.forEach(function(w){
+  var a = w.a, sg = -w.side;
+  for (var off = CFG.edge + 30; off >= CFG.edge + 18; off -= 4){
+    var cx = xs[a] + nx[a]*sg*off, cy = ys[a] + ny[a]*sg*off;
+    if (cy < ROAD_Y - 22 && inWorld(cx, cy, 14) && sample(nearD, cx, cy) > 18){
+      w.flat = { x:cx, y:cy, a:22, b:15, ang:Math.atan2(tys[a], txs[a]), sx:nx[a]*sg, sy:ny[a]*sg };
+      break;
+    }
+  }
+});
+var flats = waves.map(function(w){ return w.flat; }).filter(Boolean);
+flats = flats.filter(function(f, i){ return !flats.some(function(g, j){ return j < i && Math.hypot(f.x-g.x, f.y-g.y) < 40; }); });
+waves.forEach(function(w){ if (w.flat && flats.indexOf(w.flat) < 0) w.flat = null; });
+
+/* temporary grandstands on the flats (race week only), facing the track */
+var gsG = new Float32Array(GN), stands = [];
+waves.forEach(function(w){
+  var f = w.flat; if (!f) return;
+  var rows = 14, L = Math.min(f.a*1.7, 40), st = { w:w, cx:f.x + f.sx*1.5, cy:f.y + f.sy*1.5, ux:Math.cos(f.ang), uy:Math.sin(f.ang), sx:f.sx, sy:f.sy, L:L, D:rows*0.8, rows:rows, top:10 };
+  st.seats = rows*Math.floor(L/0.5); stands.push(st); w.stand = st;
+  for (var k = 0; k < GN; k++){
+    var x = (k % GW)*CELL - st.cx, y = Math.floor(k/GW)*CELL - st.cy, u = x*st.ux + y*st.uy, v = x*st.sx + y*st.sy;
+    if (Math.abs(u) <= L/2 && Math.abs(v) <= st.D/2) gsG[k] = Math.max(gsG[k], 1 + (v + st.D/2)/st.D*(st.top - 1));
+  }
+});
+/* big screens across the track from each wave, on gantries behind the fence */
+var screens = waves.map(function(w){
+  var sg = -w.side, shift = w.flat ? 34 : 0;
+  for (var t = 0; t < 2; t++){
+    var j = clamp(w.a + (t ? -shift : shift), 0, N-1), d = CFG.edge + 5, x = xs[j] + nx[j]*sg*d, y = ys[j] + ny[j]*sg*d;
+    if (inWorld(x, y, 6) && y < ROAD_Y - 4) return { x:x, y:y, ang:Math.atan2(tys[j], txs[j]), fx:nx[j]*w.side, fy:ny[j]*w.side, w:w };
+  }
+  return null;
+}).filter(Boolean);
+
+/* ponds: keep the existing ones that are clear of the waves and flats */
+var potential = new Float32Array(GN);
+for (var pk = 0; pk < GN; pk++){ var pm = 0; for (var pw = 0; pw < waves.length; pw++) pm = Math.max(pm, waveH(waves[pw], pk, CFG.wave.maxH)); potential[pk] = pm; }
+function pondD(p, x, y){ return Math.hypot((x-p.x)/p.a, (y-p.y)/p.b); }
+var ponds = CFG.ponds.filter(function(p){
+  var hit = false;
+  for (var t = 0; t < 12 && !hit; t++){ var an = t/12*Math.PI*2; for (var r = 0; r <= 1; r += 0.5){ if (sample(potential, p.x + Math.cos(an)*p.a*r, p.y + Math.sin(an)*p.b*r) > 0.05) hit = true; } }
+  if (flats.some(function(f){ return Math.hypot(f.x-p.x, f.y-p.y) < f.a + Math.max(p.a, p.b); })) hit = true;
+  return !hit;
+}).map(function(p){ return Object.assign({ level:0, ripples:[] }, p); });
+
+/* ---------------- static grids ---------------- */
+var base = new Float32Array(GN), catchG = new Float32Array(GN), treeG = new Float32Array(GN), flatF = new Float32Array(GN).fill(1);
+var tickRaw = new Float32Array(GN), tickTmp = new Float32Array(GN), tickG = new Float32Array(GN), O2 = new Float32Array(GN);
+var T = new Float32Array(GN), O = new Float32Array(GN), F = new Float32Array(GN), wallG = new Float32Array(GN), barG = new Uint8Array(GN);
+for (var gy = 0; gy < GH; gy++) for (var gx = 0; gx < GW; gx++){
+  var x = gx*CELL, y = gy*CELL, id = gy*GW + gx, bsum = 0, csum = 0;
+  ponds.forEach(function(p){
+    var d = pondD(p, x, y); if (d < 1) bsum -= p.depth*(1 - d*d);
+    var dist = Math.hypot(x-p.x, y-p.y); csum -= 2.6*Math.exp(-dist*dist/(2*62*62));
+  });
+  base[id] = bsum; catchG[id] = csum;
+  var ff = 1; flats.forEach(function(f){ var d = flatD(f, x, y); ff = Math.min(ff, clamp((d - 1)/0.3, 0, 1)); });
+  if (y > ROAD_Y - 3) ff = 0;
+  flatF[id] = ff;
+}
+
+/* ---------------- trees ---------------- */
 var trees = [];
 (function(){
-  var r = rng(CFG.trees.seed), M = CFG.mounds;
+  var r = rng(CFG.trees.seed);
   for (var n = 0; n < CFG.trees.tries && trees.length < CFG.trees.max; n++){
     var x = 6 + r()*(W-12), y = 6 + r()*(H-12), pine = r() < 0.3;
     var cr = pine ? 4 + r()*2.5 : 5 + r()*4, h = pine ? 12 + r()*4 : 14 + r()*6;
     if (y > ROAD_Y - cr - 4) continue;
-    if (sample(trackD, x, y) < 11 + cr*0.6) continue;
-    if (M.some(function(m){ return footD(m, x, y)*rAt(m, Math.atan2(y-m.y, x-m.x)) < rAt(m, Math.atan2(y-m.y, x-m.x)) + cr + 3; })) continue;
-    if (CFG.ponds.some(function(p){ return pondD(p, x, y) < 1.15 + cr/Math.min(p.a, p.b); })) continue;
-    if (CFG.bridges.some(function(b){ return segDist(x, y, M[b[0]].x, M[b[0]].y, M[b[1]].x, M[b[1]].y) < cr + 5; })) continue;
-    if (segDist(x, y, MEM.ax, MEM.ay, drama.x, drama.y) < cr + 10) continue;
-    if (trees.some(function(t){ return Math.hypot(t.x-x, t.y-y) < (t.cr+cr)*0.8; })) continue;
+    if (sample(nearD, x, y) < 11 + cr*0.6) continue;
+    var bad = false;
+    for (var t = 0; t < 5 && !bad; t++){ var an = t*1.257, rr = t ? cr : 0; if (sample(potential, x + Math.cos(an)*rr, y + Math.sin(an)*rr) > 0.02) bad = true; }
+    if (bad) continue;
+    if (ponds.some(function(p){ return pondD(p, x, y) < 1.15 + cr/Math.min(p.a, p.b); })) continue;
+    if (flats.some(function(f){ return flatD(f, x, y) < 1.3 + cr/f.b; })) continue;
+    if (trees.some(function(q){ return Math.hypot(q.x-x, q.y-y) < (q.cr+cr)*0.8; })) continue;
     trees.push({ x:x, y:y, cr:cr, h:h, pine:pine, shade:Math.floor(r()*4) });
   }
   trees.forEach(function(t){
@@ -319,91 +399,226 @@ var trees = [];
 })();
 
 /* ---------------- state ---------------- */
-var state = { wet:false, trees:true, sight:true, focus:0 };
-var mounds = CFG.mounds.map(function(m){ return Object.assign({ vis:new Uint8Array(N), pct:0, turns:0, cheer:false }, m); });
-var ponds = CFG.ponds.map(function(p){ return Object.assign({ level:0, ripples:[] }, p); });
-var bridges = CFG.bridges.map(function(b){ return { a:b[0], b:b[1], clear:null }; });
+var state = { wet:false, race:true, trees:true, sight:true, sound:true, focus:0 };
+var order = waves.slice().sort(function(a, b){ return a.a - b.a; });
+var bridges = [];
+for (var bi = 0; bi < order.length - 1; bi++) bridges.push({ p:order[bi], q:order[bi+1], clear:null, P:null, Q:null });
+var balloonPath = [], terrainDirty = true;
 
-function rebuildTerrain(){
-  for (var i = 0; i < GN; i++){
-    var v = base[i];
-    for (var m = 0; m < mounds.length; m++) v += mounds[m].h*unit[m][i];
-    if (memF[i] === memF[i]) v = Math.min(v, memF[i]);
-    T[i] = v; F[i] = v + catchG[i];
-    O[i] = state.trees ? Math.max(v, treeG[i]) : v;
+function blur(a, out){
+  for (var y = 0; y < GH; y++) for (var x = 0; x < GW; x++){
+    var sum = 0, c = 0;
+    for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++){ var xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= GW || yy >= GH) continue; sum += a[yy*GW + xx]; c++; }
+    out[y*GW + x] = sum/c;
   }
 }
-function clearLine(ex, ey, ez, tx, ty, tz){
+function rebuild(){
+  var vols = waves.map(function(){ return 0; }), gaCells = waves.map(function(){ return 0; });
+  waves.forEach(function(w){ w.peak = null; w.peakH = -1; w.crestCells = []; w.edgePt = null; w.edgeBest = 0; });
+  for (var k = 0; k < GN; k++){
+    var m = 0, wall = 0, i = nearI[k], up = 0, yk = Math.floor(k/GW)*CELL;
+    for (var w = 0; w < waves.length; w++){
+      var h = waveH(waves[w], k, waves[w].h);
+      if (h > 0){
+        var WV = waves[w], cxk = (k % GW)*CELL, cyk = Math.floor(k/GW)*CELL;
+        vols[w] += h*flatF[k]*CELL*CELL; if (h > m) m = h;
+        if (LAST.x0 <= LAST.rise){ up = 1; if (h > 0.3 && flatF[k] > 0.5 && cyk < ROAD_Y - 3) gaCells[w]++; }
+        if (flatF[k] > 0.5 && cyk < ROAD_Y - 3){
+          if (h > WV.peakH){ WV.peakH = h; WV.peak = { x:cxk, y:cyk, i:i }; }
+          if (Math.abs(LAST.x0 - LAST.rise) < CELL*0.75 && LAST.env > 0.25) WV.crestCells.push({ x:cxk, y:cyk, i:i, k:k });
+        }
+        if (nearD[k] - CFG.edge < 2.2 && sideG[k] === waves[w].side){
+          var u = (i - waves[w].a + CFG.wave.lenIn)/rangeOf(), st = waveStep(u, waves[w].h);
+          if (st > wall) wall = st;
+          if (st > waves[w].edgeBest){ waves[w].edgeBest = st; waves[w].edgePt = { x:(k % GW)*CELL, y:Math.floor(k/GW)*CELL }; }
+        }
+      }
+    }
+    m *= flatF[k];
+    var v = m > 0.02 ? m : base[k];
+    if (flatF[k] < 1) v = Math.min(v, m);
+    T[k] = v; F[k] = v + catchG[k]; wallG[k] = flatF[k] > 0.5 ? wall : 0;
+    tickRaw[k] = yk < ROAD_Y - 3 && ((up && m > 0.05) || nearD[k] < CFG.edge + 12 || flatF[k] < 0.99) ? 1 : 0;
+  }
+  blur(tickRaw, tickTmp); blur(tickTmp, tickG);
+  waves.forEach(function(w, j){ w.ga = gaCells[j]*CELL*CELL*CFG.gaDensity; });
+  waves.forEach(function(w, j){
+    w.vol = vols[j];
+    var u0 = 0.02; w.edgeH = waveStep(u0, w.h) > 0 ? Math.min(w.h*0.5, CFG.wave.stepMax) : 0;
+  });
+  // barrier along each crest (race day only)
+  barG.fill(0);
+  waves.forEach(function(w){
+    w.crestCells.sort(function(p, q){ return p.i - q.i; });
+    w.crest = w.crestCells;
+    w.crest.forEach(function(c){ barG[c.k] = 1; });
+    if (w.peak){
+      var j = w.peak.i, dx = w.peak.x - xs[j], dy = w.peak.y - ys[j], l = Math.hypot(dx, dy) || 1;
+      w.dir = { x:dx/l, y:dy/l };
+    } else w.dir = { x:0, y:-1 };
+  });
+  for (var k2 = 0; k2 < GN; k2++){
+    var o = T[k2];
+    if (state.trees && treeG[k2] > o) o = treeG[k2];
+    if (state.race && barG[k2]) o = Math.max(o, T[k2] + CFG.barrierH);
+    O2[k2] = o;
+    if (state.race && gsG[k2] > 0) o = Math.max(o, T[k2] + gsG[k2]);
+    O[k2] = o;
+  }
+  bridges.forEach(function(b){ b.P = anchor(b.p); b.Q = anchor(b.q); });
+  buildBalloonPath();
+  computeRoute();
+  terrainDirty = true;
+}
+function anchor(w){ var p = w.peak ? { x:w.peak.x, y:w.peak.y } : wavePoint(w, 0.3, crestD(w)); p.z = sample(T, p.x, p.y); return p; }
+function backPt(w, extra){ var a = anchor(w), d = Math.max(5, CFG.wave.back*w.h) + extra; return { x:a.x + w.dir.x*d, y:a.y + w.dir.y*d }; }
+function clearLine(ex, ey, ez, tx, ty, tz, G){
+  G = G || O;
   var D = Math.hypot(tx-ex, ty-ey), n = Math.max(2, Math.ceil(D/1.5));
   for (var k = 1; k < n; k++){
     var t = k/n; if (t*D < 2) continue;
-    if (sample(O, ex + (tx-ex)*t, ey + (ty-ey)*t) > ez + (tz-ez)*t) return false;
+    if (sample(G, ex + (tx-ex)*t, ey + (ty-ey)*t) > ez + (tz-ez)*t) return false;
   }
   return true;
 }
+function crossesCrest(ax, ay, bx, by){
+  var D = Math.hypot(bx-ax, by-ay), n = Math.ceil(D/1.5);
+  for (var k = 1; k < n; k++){ var t = k/n; if (barG[nearestCell(ax + (bx-ax)*t, ay + (by-ay)*t)]) return true; }
+  return false;
+}
 function computeVis(){
-  mounds.forEach(function(m){
-    m.vis.fill(0);
-    var ez = sample(T, m.x, m.y) + CFG.eye, seen = 0;
+  waves.forEach(function(w){
+    w.vis.fill(0);
+    var a0 = anchor(w), e = { x:a0.x - w.dir.x*3, y:a0.y - w.dir.y*3 }, ez = sample(T, e.x, e.y) + CFG.eye, seen = 0, seen2 = 0, chk2 = state.race && stands.length;
+    w.eye = { x:e.x, y:e.y };
     visIdx.forEach(function(i){
-      if (Math.hypot(xs[i]-m.x, ys[i]-m.y) > CFG.viewDist) return;
-      if (clearLine(m.x, m.y, ez, xs[i], ys[i], sample(T, xs[i], ys[i]) + 1.0)){ seen++; for (var j = i; j < Math.min(N, i+4); j++) m.vis[j] = 1; }
+      if (Math.hypot(xs[i]-e.x, ys[i]-e.y) > CFG.viewDist) return;
+      var tz = sample(T, xs[i], ys[i]) + 1.0;
+      if (clearLine(e.x, e.y, ez, xs[i], ys[i], tz)){ seen++; seen2++; for (var j = i; j < Math.min(N, i+4); j++) w.vis[j] = 1; }
+      else if (chk2 && clearLine(e.x, e.y, ez, xs[i], ys[i], tz, O2)) seen2++;
     });
-    m.pct = seen/visIdx.length;
-    m.turns = turns.filter(function(t){ var c = 0; t.samples.forEach(function(i){ c += m.vis[i]; }); return t.samples.length && c >= t.samples.length*0.5; }).length;
+    w.pct = seen/visIdx.length; w.gsBlock = (seen2 - seen)/visIdx.length;
+    w.turns = turns.filter(function(t){ var c = 0; t.samples.forEach(function(i){ c += w.vis[i]; }); return t.samples.length && c >= t.samples.length*0.5; }).length;
+    // can someone standing behind the crest (park side) see the corner?
+    w.leak = false;
+    [-0.35, 0, 0.35].forEach(function(f){
+      if (w.leak) return;
+      var bb = backPt(w, 6), b = { x:bb.x - w.dir.y*f*30, y:bb.y + w.dir.x*f*30 }; if (!inWorld(b.x, b.y, 2) || b.y > ROAD_Y - 3) return;
+      var bz = sample(T, b.x, b.y) + CFG.eye;
+      for (var j = Math.max(0, w.a - 40); j <= Math.min(N-1, w.a + 40); j += 6){
+        if (crossesCrest(b.x, b.y, xs[j], ys[j]) && clearLine(b.x, b.y, bz, xs[j], ys[j], 1.0)){ w.leak = true; break; }
+      }
+    });
   });
-  MEM.sees = clearLine(MEM.ax + MEM.dx*1.5, MEM.ay + MEM.dy*1.5, sample(T, MEM.ax, MEM.ay) + CFG.eye, drama.x, drama.y, sample(T, drama.x, drama.y) + 1.0);
 }
 function computeBridges(){
   bridges.forEach(function(b){
-    var P = mounds[b.a], Q = mounds[b.b], best = null;
+    var P = b.P, Q = b.Q, best = null;
     for (var i = 0; i < N-1; i++){
       var x1 = xs[i], y1 = ys[i], x2 = xs[i+1], y2 = ys[i+1];
       var d = (Q.x-P.x)*(y2-y1) - (Q.y-P.y)*(x2-x1); if (Math.abs(d) < 1e-9) continue;
       var u = ((x1-P.x)*(y2-y1) - (y1-P.y)*(x2-x1))/d, v = ((x1-P.x)*(Q.y-P.y) - (y1-P.y)*(Q.x-P.x))/d;
       if (u < 0 || u > 1 || v < 0 || v > 1) continue;
-      var cxp = P.x + (Q.x-P.x)*u, cyp = P.y + (Q.y-P.y)*u, z = P.h + (Q.h-P.h)*u - sample(T, cxp, cyp);
-      if (best === null || z < best) best = z;
+      var z = P.z + (Q.z - P.z)*u; if (best === null || z < best) best = z;
     }
     b.clear = best;
   });
 }
-function soil(m){ return 0.4*Math.PI*m.r*m.r*m.h*(1 + m.bump*m.bump/2); }
+function buildBalloonPath(){
+  balloonPath = [];
+  if (!order.length) return;
+  var first = order[0], b0 = backPt(first, 10);
+  balloonPath.push({ x: clamp(b0.x - 30, 10, W-10), y: 4 });
+  if (b0.y < ROAD_Y - 6) balloonPath.push(b0);
+  order.forEach(function(w){ balloonPath.push(anchor(w)); });
+  var last = order[order.length-1], bl = backPt(last, 10);
+  if (bl.y < ROAD_Y - 6 && inWorld(bl.x, bl.y)) balloonPath.push(bl);
+}
+
+/* ---------------- step-free route: avoids slopes over 1:12, ponds and the rail ---------------- */
+var route = [], underpasses = [], ENTRANCE = null;
+function computeRoute(){
+  route = []; underpasses = [];
+  if (!order.length || !balloonPath.length) return;
+  ENTRANCE = balloonPath[0];
+  var dist = new Float64Array(GN).fill(Infinity), prev = new Int32Array(GN).fill(-1), heap = [], start = nearestCell(ENTRANCE.x, ENTRANCE.y + 4);
+  function push(k, d){ heap.push([d, k]); var i = heap.length - 1; while (i){ var pa = (i-1) >> 1; if (heap[pa][0] <= heap[i][0]) break; var t = heap[pa]; heap[pa] = heap[i]; heap[i] = t; i = pa; } }
+  function pop(){ var top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; var i = 0; for (;;){ var l = 2*i+1, r = l+1, m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; var t = heap[m]; heap[m] = heap[i]; heap[i] = t; i = m; } } return top; }
+  dist[start] = 0; push(start, 0);
+  var DX = [1,-1,0,0,1,1,-1,-1], DY = [0,0,1,-1,1,-1,1,-1];
+  while (heap.length){
+    var q = pop(), d = q[0], k = q[1]; if (d > dist[k]) continue;
+    var x = k % GW, y = (k - x)/GW;
+    for (var n = 0; n < 8; n++){
+      var xx = x + DX[n], yy = y + DY[n]; if (xx < 0 || yy < 0 || xx >= GW || yy >= GH) continue;
+      var kk = yy*GW + xx; if (yy*CELL > ROAD_Y - 3 || base[kk] < -0.3) continue;
+      var l = n < 4 ? CELL : CELL*1.4142, sl = Math.abs(T[kk] - T[k])/l;
+      if (sl > 1/12) continue;
+      var c = l*(1 + 10*sl); if (nearD[kk] < CFG.edge + 1) c += 40;
+      if (d + c < dist[kk]){ dist[kk] = d + c; prev[kk] = k; push(kk, d + c); }
+    }
+  }
+  var targets = stands.map(function(st){ return { x:st.cx + st.sx*(st.D/2 + 3), y:st.cy + st.sy*(st.D/2 + 3) }; });
+  order.forEach(function(w){ var b = backPt(w, 3); if (inWorld(b.x, b.y, 2) && b.y < ROAD_Y - 4) targets.push(b); });
+  targets.forEach(function(tg){
+    var k = nearestCell(tg.x, tg.y); if (!isFinite(dist[k])) return;
+    var pts = [], onTrack = false;
+    while (k >= 0){
+      var px = (k % GW)*CELL, py = Math.floor(k/GW)*CELL, tr = nearD[k] < CFG.edge + 1;
+      if (tr && !onTrack) underpasses.push({ x:px, y:py, i:nearI[k] });
+      onTrack = tr; pts.push({ x:px, y:py }); k = prev[k];
+    }
+    route.push(pts.reverse());
+  });
+  underpasses = underpasses.filter(function(u, i){ return !underpasses.some(function(v, j){ return j < i && Math.hypot(u.x-v.x, u.y-v.y) < 20; }); });
+}
 
 /* ---------------- UI ---------------- */
 var hillsEl = document.getElementById("hills"), rows = [];
-mounds.forEach(function(m, i){
+waves.forEach(function(w, i){
   var row = document.createElement("div");
-  row.className = "hill"; row.style.setProperty("--c", m.color);
+  row.className = "hill"; row.style.setProperty("--c", w.color);
   row.innerHTML =
-    '<div class="hill-top"><button type="button" class="hill-name" aria-pressed="false"><span class="dot"></span>Hill ' + m.id + ' <small>sightlines</small></button>' +
+    '<div class="hill-top"><button type="button" class="hill-name" aria-pressed="false"><span class="dot"></span>Wave at ' + w.name + ' <small>' + Math.round(w.turn.vin*3.6) + '→' + Math.round(w.turn.vmin*3.6) + ' km/h</small></button>' +
     '<output for="h-' + i + '"></output></div>' +
-    '<label class="sr" for="h-' + i + '">Hill ' + m.id + ' height in metres</label>' +
-    '<input type="range" id="h-' + i + '" min="0" max="15" step="0.5" value="' + m.h + '">' +
+    '<label class="sr" for="h-' + i + '">Wave at ' + w.name + ', crest height in metres</label>' +
+    '<input type="range" id="h-' + i + '" min="0" max="' + CFG.wave.maxH + '" step="0.5" value="' + w.h + '">' +
     '<div class="meter" aria-hidden="true"><i></i></div>' +
-    '<div class="stats"><span><b class="s-pct"></b> of track in view</span><span><b class="s-turn"></b> turns</span><span><b class="s-soil"></b> m³ soil</span></div>';
+    '<div class="stats"><span><b class="s-pct"></b> of track in view</span><span><b class="s-turn"></b> turns</span><span><b class="s-soil"></b> m³ soil</span><span>stone edge <b class="s-edge"></b></span><span><b class="s-ga"></b> standing</span><span class="chip s-leak"></span><span class="chip s-gs" hidden></span></div>';
   hillsEl.appendChild(row);
   var input = row.querySelector("input"), btn = row.querySelector(".hill-name");
-  input.addEventListener("input", function(){ m.h = parseFloat(input.value); refresh(); });
+  input.addEventListener("input", function(){ w.h = parseFloat(input.value); refresh(); });
   btn.addEventListener("click", function(){ setFocus(i); });
-  rows.push({ row:row, btn:btn, out:row.querySelector("output"), bar:row.querySelector(".meter i"), pct:row.querySelector(".s-pct"), turn:row.querySelector(".s-turn"), soil:row.querySelector(".s-soil") });
+  rows.push({ row:row, btn:btn, out:row.querySelector("output"), bar:row.querySelector(".meter i"), pct:row.querySelector(".s-pct"), turn:row.querySelector(".s-turn"), soil:row.querySelector(".s-soil"), edge:row.querySelector(".s-edge"), leak:row.querySelector(".s-leak"), ga:row.querySelector(".s-ga"), gs:row.querySelector(".s-gs") });
 });
 var brEl = document.getElementById("bridges"), brRows = bridges.map(function(b){
   var li = document.createElement("li");
-  li.innerHTML = '<span>Hill ' + mounds[b.a].id + ' → Hill ' + mounds[b.b].id + '</span><span><b class="c"></b> <span class="chip"></span></span>';
+  li.innerHTML = '<span>' + b.p.name + ' → ' + b.q.name + '</span><span><b class="c"></b> <span class="chip"></span></span>';
   brEl.appendChild(li);
   return { c:li.querySelector(".c"), chip:li.querySelector(".chip") };
 });
 function setFocus(i){ state.focus = i; rows.forEach(function(r, j){ r.row.classList.toggle("on", j === i); r.btn.setAttribute("aria-pressed", j === i ? "true" : "false"); }); }
 function updateStats(){
-  mounds.forEach(function(m, i){
+  waves.forEach(function(w, i){
     var r = rows[i];
-    r.out.textContent = fmtH(m.h) + " m";
-    r.bar.style.width = Math.round(m.pct*100) + "%";
-    r.pct.textContent = Math.round(m.pct*100) + "%";
-    r.turn.textContent = m.turns + "/" + turns.length;
-    r.soil.textContent = fmtN(Math.round(soil(m)/100)*100);
+    r.out.textContent = fmtH(w.h) + " m";
+    r.bar.style.width = Math.round(w.pct*100) + "%";
+    r.pct.textContent = Math.round(w.pct*100) + "%";
+    r.turn.textContent = w.turns + "/" + turns.length;
+    r.soil.textContent = fmtN(Math.round(w.vol/100)*100);
+    r.edge.textContent = w.edgeH.toFixed(1) + " m";
+    r.ga.textContent = "≈ " + fmtN(Math.round(w.ga/50)*50);
+    var gb = Math.round((w.gsBlock || 0)*100);
+    r.gs.hidden = !(state.race && gb >= 1);
+    if (!r.gs.hidden){ r.gs.textContent = "grandstands block " + gb + "% of view"; r.gs.className = "chip bad s-gs"; }
+    if (!state.race){ r.leak.textContent = "open park"; r.leak.className = "chip mid s-leak"; }
+    else if (w.leak){ r.leak.textContent = "corner visible from outside"; r.leak.className = "chip bad s-leak"; }
+    else { r.leak.textContent = "outside view blocked"; r.leak.className = "chip ok s-leak"; }
   });
+  var ga = waves.reduce(function(a, w){ return a + w.ga; }, 0), gs = stands.reduce(function(a, st){ return a + st.seats; }, 0);
+  document.getElementById("cap-ga").textContent = "≈ " + fmtN(Math.round(ga/100)*100);
+  document.getElementById("cap-gs").textContent = fmtN(gs) + " (" + stands.length + " stands)";
+  document.getElementById("cap-all").textContent = state.race ? "≈ " + fmtN(Math.round((ga + gs)/100)*100) : "park day";
   bridges.forEach(function(b, i){
     var r = brRows[i];
     if (b.clear === null){ r.c.textContent = "doesn't cross"; r.chip.textContent = "OK"; r.chip.className = "chip ok"; return; }
@@ -411,12 +626,8 @@ function updateStats(){
     r.c.textContent = b.clear.toFixed(1) + " m above track";
     r.chip.textContent = ok ? "OK" : "Too low"; r.chip.className = "chip " + (ok ? "ok" : "bad");
   });
-  var A = mounds[MEM.hill], wall = A.h*moundUnit(A, MEM.ax, MEM.ay) + MEM.depth;
-  document.getElementById("mem-text").textContent = "A V-shaped cut, open to the sky, whose mouth faces " + drama.name + ": the hardest braking on this stretch, " + Math.round(drama.vin*3.6) + " → " + Math.round(drama.vmin*3.6) + " km/h. Walk down along the walls, turn at the deepest point, and the turn is in front of you.";
-  document.getElementById("mem-see").textContent = MEM.sees ? "yes" : "blocked";
-  document.getElementById("mem-wall").textContent = wall.toFixed(1) + " m";
 }
-function refresh(){ rebuildTerrain(); computeVis(); computeBridges(); updateStats(); }
+function refresh(){ rebuild(); computeVis(); computeBridges(); updateStats(); }
 
 var btnDry = document.getElementById("btn-dry"), btnWet = document.getElementById("btn-wet");
 var hint = document.getElementById("season-hint"), waterBox = document.getElementById("water"), waterVal = document.getElementById("water-val");
@@ -424,18 +635,30 @@ function setSeason(wet){
   state.wet = wet;
   btnDry.setAttribute("aria-pressed", wet ? "false" : "true");
   btnWet.setAttribute("aria-pressed", wet ? "true" : "false");
-  hint.textContent = wet ? "Rain runs down the hills into the existing ponds, which rise instead of the streets flooding. The memorial floor drains at its deepest point." : "The ponds dry out to 0%: empty basins, waiting for the next rain.";
+  hint.textContent = wet ? "Rain runs down the ripples. Water reaching the track edge drops into the drain under the stone edge; the rest flows to the ponds." : "The ponds dry out to 0%: empty basins, waiting for the next rain.";
   waterBox.hidden = !wet;
   if (wet) collected = 0;
 }
 btnDry.addEventListener("click", function(){ setSeason(false); });
 btnWet.addEventListener("click", function(){ setSeason(true); });
+var btnRace = document.getElementById("btn-race"), btnPark = document.getElementById("btn-park"), evHint = document.getElementById("ev-hint");
+function setDay(race){
+  state.race = race;
+  btnRace.setAttribute("aria-pressed", race ? "true" : "false");
+  btnPark.setAttribute("aria-pressed", race ? "false" : "true");
+  evHint.textContent = race ? "Two ways to watch. Cheap tickets: stand on the waves, squeezed in with everyone else. Paid seats: a temporary grandstand on the flat across the track. The red line is the ticket fence, running along each crest. Balloons lead the crowd to the gates, and big screens across the track show the rest of the race." : "Grandstands and fences come down. The waves are open park and the flats hold markets.";
+  refresh();
+}
+btnRace.addEventListener("click", function(){ setDay(true); });
+btnPark.addEventListener("click", function(){ setDay(false); });
 document.getElementById("chk-trees").addEventListener("change", function(e){ state.trees = e.target.checked; refresh(); });
 document.getElementById("chk-sight").addEventListener("change", function(e){ state.sight = e.target.checked; });
+document.getElementById("chk-sound").addEventListener("change", function(e){ state.sound = e.target.checked; rings.length = 0; });
 
 /* ---------------- canvas & static layers ---------------- */
 var cv = document.getElementById("scene"), ctx = cv.getContext("2d");
 var dpr = 1, s = 1, cssW = 0, cssH = 0, groundL = null, treeL = null;
+var terrC = document.createElement("canvas"), tctx = terrC.getContext("2d");
 function layer(){ var c = document.createElement("canvas"); c.width = cv.width; c.height = cv.height; var g = c.getContext("2d"); g.setTransform(dpr*s,0,0,dpr*s,0,0); return [c,g]; }
 function trackPath(g, off, from, to){
   g.beginPath();
@@ -451,12 +674,11 @@ function buildLayers(){
   g.lineWidth = 0.4; g.strokeStyle = "#76A04B"; g.lineCap = "round"; g.lineJoin = "round";
   for (var t = 0; t < 800; t++){
     var x = r()*W, y = r()*H;
-    if (y > ROAD_Y - 2 || sample(trackD,x,y) < 9) continue;
+    if (y > ROAD_Y - 2 || sample(nearD,x,y) < 9) continue;
     g.beginPath(); g.moveTo(x-1.1,y); g.lineTo(x-0.5,y-1.7); g.lineTo(x,y); g.lineTo(x+0.6,y-1.9); g.lineTo(x+1.1,y); g.stroke();
   }
   var fl = ["#F4A6C0","#F6D35B","#FFFFFF","#C7A2E0"];
-  for (var f = 0; f < 100; f++){ var fx = r()*W, fy = r()*H; if (fy > ROAD_Y - 2 || sample(trackD,fx,fy) < 9) continue; g.fillStyle = fl[f%4]; g.beginPath(); g.arc(fx,fy,0.7,0,Math.PI*2); g.fill(); }
-  // rail + expressway along the east edge
+  for (var f = 0; f < 100; f++){ var fx = r()*W, fy = r()*H; if (fy > ROAD_Y - 2 || sample(nearD,fx,fy) < 9) continue; g.fillStyle = fl[f%4]; g.beginPath(); g.arc(fx,fy,0.7,0,Math.PI*2); g.fill(); }
   g.fillStyle = "#CFC7B8"; g.fillRect(0, ROAD_Y, W, H-ROAD_Y);
   g.strokeStyle = INK; g.lineWidth = 1; g.beginPath(); g.moveTo(0, ROAD_Y); g.lineTo(W, ROAD_Y); g.stroke();
   [ROAD_Y + 12, ROAD_Y + 17].forEach(function(ry){ g.strokeStyle = "#7D6B58"; g.lineWidth = 0.7; g.beginPath(); g.moveTo(0, ry); g.lineTo(W, ry); g.stroke(); });
@@ -465,7 +687,6 @@ function buildLayers(){
   g.strokeStyle = "rgba(255,255,255,0.8)"; g.lineWidth = 0.6; g.setLineDash([6,6]);
   [ROAD_Y + 40, ROAD_Y + 52].forEach(function(ly){ g.beginPath(); g.moveTo(0, ly); g.lineTo(W, ly); g.stroke(); });
   g.setLineDash([]);
-  // track
   var tw = CFG.trackWidth;
   trackPath(g, 0, 0, N-1); g.strokeStyle = INK; g.lineWidth = tw + 2.6; g.stroke();
   trackPath(g, 0, 0, N-1); g.strokeStyle = "#9B958D"; g.lineWidth = tw; g.stroke();
@@ -478,7 +699,6 @@ function buildLayers(){
       g.setLineDash([2.6,2.6]); trackPath(g, o, a, b); g.strokeStyle = "#D9483A"; g.stroke(); g.setLineDash([]);
     });
   });
-  // trees
   var TL = layer(), tg = TL[1]; treeL = TL[0];
   var canopy = ["#6FA548","#5E9A3E","#7DB356","#68A04A"];
   trees.slice().sort(function(a,b){ return a.y-b.y; }).forEach(function(t){
@@ -499,6 +719,39 @@ function buildLayers(){
     }
   });
 }
+/* terrain raster: hillshade + contours, rebuilt only when heights change */
+var G0 = hexRgb("#9DC66B"), G1 = hexRgb("#DCEFB0"), STONE = hexRgb("#5E5A57");
+function buildTerrain(){
+  var w = Math.round(W*RES), h = Math.round(ROAD_Y*RES);
+  if (terrC.width !== w){ terrC.width = w; terrC.height = h; }
+  var img = tctx.createImageData(w, h), D = img.data, inv = 1/RES;
+  var LX = -0.5, LY = -0.62, LZ = 0.6, ln = Math.hypot(LX, LY, LZ); LX /= ln; LY /= ln; LZ /= ln;
+  for (var py = 0; py < h; py++){
+    var y = (py + 0.5)*inv;
+    for (var px = 0; px < w; px++){
+      var x = (px + 0.5)*inv, z = sample(T, x, y), o = (py*w + px)*4;
+      var wl = wallG[nearestCell(x, y)];
+      if (state.race){
+        var t0 = sample(tickG, x, y) - 0.5, t1 = sample(tickG, x + 2*inv, y) - 0.5, t2 = sample(tickG, x, y + 2*inv) - 0.5;
+        if (t0*t1 < 0 || t0*t2 < 0){ D[o] = 200; D[o+1] = 50; D[o+2] = 43; D[o+3] = 235; continue; }
+      }
+      if (z < 0.04 && wl < 0.25){ D[o+3] = 0; continue; }
+      var zr = sample(T, x + inv, y), zd = sample(T, x, y + inv);
+      var gx = (zr - z)*RES, gy = (zd - z)*RES;
+      var nl = (-gx*LX - gy*LY + LZ)/Math.sqrt(gx*gx + gy*gy + 1), sh = clamp(0.62 + 0.55*(nl - LZ) + 0.25, 0.55, 1.25);
+      var c;
+      if (wl > 0.25 && nearDAt(x, y) - CFG.edge < 2.4){ c = STONE; sh = clamp(sh*0.95, 0.5, 1.15); }
+      else { var t = clamp(z/12, 0, 1); c = [G0[0] + (G1[0]-G0[0])*t, G0[1] + (G1[1]-G0[1])*t, G0[2] + (G1[2]-G0[2])*t]; }
+      var b0 = Math.floor(z/0.4), dark = (Math.floor(zr/0.4) !== b0 || Math.floor(zd/0.4) !== b0) && z > 0.1;
+      var k = dark ? (((b0 % 5) === 0) ? 0.8 : 0.9) : 1;
+      D[o] = clamp(c[0]*sh*k, 0, 255); D[o+1] = clamp(c[1]*sh*k, 0, 255); D[o+2] = clamp(c[2]*sh*k, 0, 255);
+      D[o+3] = wl > 0.25 ? 255 : clamp(z/0.25, 0, 1)*255;
+    }
+  }
+  tctx.putImageData(img, 0, 0);
+  terrainDirty = false;
+}
+function nearDAt(x, y){ return sample(nearD, x, y); }
 function resize(){
   var frame = cv.parentElement;
   cssW = frame.clientWidth; cssH = Math.round(cssW*H/W);
@@ -508,117 +761,128 @@ function resize(){
 }
 
 /* ---------------- dynamic drawing ---------------- */
-function poly(m, d, ox, oy){
-  ctx.beginPath();
-  for (var k = 0; k <= 64; k++){
-    var th = k/64*Math.PI*2, rr = rAt(m, th)*d, x = m.x + Math.cos(th)*rr + ox, y = m.y + Math.sin(th)*rr + oy;
-    if (k) ctx.lineTo(x,y); else ctx.moveTo(x,y);
-  }
-  ctx.closePath();
-}
-function wedgePath(lift){
-  var far = memHill.r*3;
-  ctx.moveTo(MEM.ax, MEM.ay - lift);
-  ctx.lineTo(MEM.ax + Math.cos(MEM.th + MEM.spread)*far, MEM.ay + Math.sin(MEM.th + MEM.spread)*far - lift);
-  ctx.lineTo(MEM.ax + Math.cos(MEM.th - MEM.spread)*far, MEM.ay + Math.sin(MEM.th - MEM.spread)*far - lift);
-  ctx.closePath();
-}
-function drawMound(m, i){
-  var h = m.h, isMem = i === MEM.hill;
-  ctx.fillStyle = "rgba(60,50,30,0.17)"; poly(m, 1.03, h*0.4, h*0.22); ctx.fill();
-  if (h < 0.3){
-    poly(m, 1, 0, 0); ctx.setLineDash([3,2]); ctx.strokeStyle = INK; ctx.lineWidth = 0.7; ctx.stroke(); ctx.setLineDash([]);
-  } else {
-    var nL = Math.max(2, Math.ceil(h/1.1)), ds = [];
-    for (var j = 0; j < nL; j++){
-      var l = h*j/nL, d = Math.sqrt(Math.max(0, 1 - Math.pow(l/h, 2/3)));
-      ds.push([d, l]);
-      if (isMem){ ctx.save(); ctx.beginPath(); ctx.rect(-100, -100, W+200, H+200); wedgePath(l*K); ctx.clip("evenodd"); }
-      poly(m, d, 0, -l*K); ctx.fillStyle = mix("#79A94A", "#C6E08E", j/(nL-1)); ctx.fill();
-      if (j === 0){ ctx.strokeStyle = INK; ctx.lineWidth = 0.9; } else { ctx.strokeStyle = "rgba(255,255,225,0.5)"; ctx.lineWidth = 0.5; }
-      ctx.stroke();
-      if (isMem) ctx.restore();
-    }
-    // switchback path, on the side away from the memorial for Hill A
-    var pathTh = isMem ? MEM.th + Math.PI : Math.PI/2;
-    ctx.beginPath();
-    ds.forEach(function(q, j){
-      var th = pathTh + (j % 2 ? 0.5 : -0.5), rr = rAt(m, th)*q[0]*0.9;
-      var x = m.x + Math.cos(th)*rr, y = m.y + Math.sin(th)*rr - q[1]*K;
-      if (j) ctx.lineTo(x,y); else ctx.moveTo(x,y);
-    });
-    ctx.lineTo(m.x, m.y - h*K);
-    ctx.lineJoin = "round"; ctx.strokeStyle = "#B4966A"; ctx.lineWidth = 1.7; ctx.stroke();
-    ctx.strokeStyle = "#F3E3BC"; ctx.lineWidth = 1.0; ctx.stroke();
-    if (isMem) drawMemorial(m);
-  }
-  if (i === state.focus && state.sight){ poly(m, 1.06, 0, 0); ctx.setLineDash([3,2.2]); ctx.strokeStyle = m.color; ctx.lineWidth = 1.3; ctx.stroke(); ctx.setLineDash([]); }
-  var tx = m.x, ty = m.y - h*K;
-  ctx.strokeStyle = INK; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(tx+5, ty+0.5); ctx.lineTo(tx+5, ty-8); ctx.stroke();
-  ctx.fillStyle = m.color; ctx.beginPath(); ctx.moveTo(tx+5, ty-8); ctx.lineTo(tx+10.5, ty-6.4); ctx.lineTo(tx+5, ty-4.8); ctx.closePath(); ctx.fill(); ctx.lineWidth = 0.4; ctx.stroke();
-  var shirts = ["#F2B95B","#EFEAD8","#E98B7A"];
-  [[-3.2,1],[0,-1.2],[2.8,1.3]].forEach(function(o, k){
-    var jump = m.cheer && !reduced ? Math.abs(Math.sin(now*9 + k*1.7 + i))*1.8 : 0;
-    person(tx + o[0], ty + o[1] - jump, shirts[k]);
-  });
-}
 function person(px, py, shirt){
   ctx.fillStyle = shirt; ctx.strokeStyle = INK; ctx.lineWidth = 0.3;
-  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(px-0.8, py-2.2, 1.6, 2.2, 0.6); else ctx.rect(px-0.8, py-2.2, 1.6, 2.2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "#F2D3B3"; ctx.beginPath(); ctx.arc(px, py-3, 0.9, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(px, py, 1.05, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#F2D3B3"; ctx.beginPath(); ctx.arc(px, py - 0.2, 0.55, 0, Math.PI*2); ctx.fill();
 }
-function drawMemorial(m){
-  // floor: the wedge inside the hill's footprint, paved, sloping down to the drain at the apex
-  ctx.save(); poly(m, 1, 0, 0); ctx.clip();
-  ctx.beginPath(); wedgePath(0); ctx.fillStyle = "#DAD3C4"; ctx.fill();
-  ctx.strokeStyle = "rgba(74,58,44,0.12)"; ctx.lineWidth = 0.35;
-  for (var k = 2; k < MEM.run + 30; k += 3){
-    var cx = MEM.ax + MEM.dx*k, cy = MEM.ay + MEM.dy*k, px = -MEM.dy, py = MEM.dx;
-    ctx.beginPath(); ctx.moveTo(cx - px*60, cy - py*60); ctx.lineTo(cx + px*60, cy + py*60); ctx.stroke();
-  }
-  ctx.restore();
-  // walls: polished dark stone, height = hill surface above the floor, tallest at the apex
-  var walls = MEM.wings.map(function(w){
-    var top = [], bot = [];
-    for (var k = 0; k <= 16; k++){
-      var t = k/16, x = MEM.ax + w.wx*w.len*t, y = MEM.ay + w.wy*w.len*t;
-      var zt = m.h*moundUnit(m, x, y), zf = memFloor(x, y); if (zf === null) zf = 0;
-      top.push([x, y - zt*K]); bot.push([x, y - zf*K]);
-    }
-    return { top:top, bot:bot, y:MEM.ay + w.wy*w.len*0.5 };
-  }).sort(function(a, b){ return a.y - b.y; });
-  walls.forEach(function(wl){
-    ctx.beginPath();
-    wl.top.forEach(function(p, k){ if (k) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
-    for (var k = wl.bot.length - 1; k >= 0; k--) ctx.lineTo(wl.bot[k][0], wl.bot[k][1]);
-    ctx.closePath(); ctx.fillStyle = "#2B2B30"; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 0.4; ctx.stroke();
-    ctx.beginPath(); wl.top.forEach(function(p, k){ if (k) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
-    ctx.strokeStyle = "#8A8A95"; ctx.lineWidth = 0.5; ctx.stroke();
+function drawFlat(w){
+  var f = w.flat; if (!f) return;
+  ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.ang);
+  ctx.fillStyle = "#E9DCC0"; ctx.strokeStyle = INK; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.ellipse(0, 0, f.a, f.b, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = "rgba(140,100,64,0.22)"; ctx.lineWidth = 0.35;
+  for (var gx = -f.a; gx <= f.a; gx += 3){ ctx.beginPath(); ctx.moveTo(gx, -f.b); ctx.lineTo(gx, f.b); ctx.stroke(); }
+  for (var gy = -f.b; gy <= f.b; gy += 3){ ctx.beginPath(); ctx.moveTo(-f.a, gy); ctx.lineTo(f.a, gy); ctx.stroke(); }
+  ctx.restore(); ctx.restore();
+  if (state.race && w.stand){ drawStand(w.stand); return; }
+  [-0.45, 0, 0.45].forEach(function(o, n){
+    var kx = f.x + Math.cos(f.ang)*f.a*o + f.sx*4, ky = f.y + Math.sin(f.ang)*f.a*o + f.sy*4;
+    ctx.fillStyle = PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 0.35; ctx.fillRect(kx-2.6, ky-1.6, 5.2, 3.2); ctx.strokeRect(kx-2.6, ky-1.6, 5.2, 3.2);
+    ctx.fillStyle = ["#E2694E","#7B5EA7","#3FA27A"][n]; ctx.beginPath(); ctx.moveTo(kx-3.2, ky-1.4); ctx.lineTo(kx, ky-4.2); ctx.lineTo(kx+3.2, ky-1.4); ctx.closePath(); ctx.fill(); ctx.stroke();
   });
-  // drain grate + one visitor at the apex, looking out
-  var fz = MEM.depth*K;
-  ctx.fillStyle = "#6B6B70"; ctx.fillRect(MEM.ax - 1.2, MEM.ay + fz - 0.6, 2.4, 1.2);
-  person(MEM.ax + MEM.dx*4, MEM.ay + MEM.dy*4 + fz*0.6, "#3F4A5C");
+}
+function drawStand(st){
+  function P(u, v){ return [st.cx + st.ux*u + st.sx*v, st.cy + st.uy*u + st.sy*v]; }
+  function quad(q){ ctx.beginPath(); q.forEach(function(p, n){ var c = P(p[0], p[1]); if (n) ctx.lineTo(c[0], c[1]); else ctx.moveTo(c[0], c[1]); }); ctx.closePath(); }
+  var hl = st.L/2, hd = st.D/2;
+  quad([[-hl,-hd],[hl,-hd],[hl,hd+6],[-hl,hd+6]]); ctx.fillStyle = "rgba(40,30,20,0.25)"; ctx.fill();
+  for (var r = 0; r < st.rows; r++){
+    var v0 = -hd + r*0.8; quad([[-hl,v0],[hl,v0],[hl,v0+0.8],[-hl,v0+0.8]]);
+    ctx.fillStyle = r % 2 ? "#C9472F" : "#E0583D"; ctx.fill();
+  }
+  quad([[-hl,-hd],[hl,-hd],[hl,hd],[-hl,hd]]); ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.stroke();
+  var a = P(-hl, hd), b = P(hl, hd); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineWidth = 2; ctx.strokeStyle = "#5A4636"; ctx.stroke();
+  var rr = rng(Math.round(st.cx*13 + st.cy)), shirts = ["#FFF3D6","#F6C945","#9CC9E8","#FFFFFF"];
+  for (var n = 0; n < 70; n++){ var c = P((rr() - 0.5)*st.L*0.94, -hd + (Math.floor(rr()*st.rows) + 0.5)*0.8); ctx.fillStyle = shirts[n % 4]; ctx.beginPath(); ctx.arc(c[0], c[1], 0.38, 0, Math.PI*2); ctx.fill(); }
+}
+function drawScreen(sc){
+  if (!state.race) return;
+  var ux = Math.cos(sc.ang), uy = Math.sin(sc.ang), hw = 9;
+  ctx.fillStyle = "rgba(255,240,170,0.22)"; ctx.beginPath();
+  ctx.moveTo(sc.x - ux*hw, sc.y - uy*hw); ctx.lineTo(sc.x + ux*hw, sc.y + uy*hw);
+  ctx.lineTo(sc.x + ux*hw*2.4 + sc.fx*40, sc.y + uy*hw*2.4 + sc.fy*40); ctx.lineTo(sc.x - ux*hw*2.4 + sc.fx*40, sc.y - uy*hw*2.4 + sc.fy*40); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.translate(sc.x, sc.y); ctx.rotate(sc.ang);
+  ctx.fillStyle = INK; ctx.fillRect(-hw - 0.6, -1.6, 1.2, 3.2); ctx.fillRect(hw - 0.6, -1.6, 1.2, 3.2);
+  ctx.fillStyle = "#26303A"; ctx.strokeStyle = INK; ctx.lineWidth = 0.5; ctx.fillRect(-hw, -1.1, hw*2, 2.2); ctx.strokeRect(-hw, -1.1, hw*2, 2.2);
+  ctx.restore();
+  ctx.strokeStyle = "#BFE3FF"; ctx.lineWidth = 0.9; ctx.beginPath();
+  ctx.moveTo(sc.x - ux*(hw-0.6) + sc.fx*1.1, sc.y - uy*(hw-0.6) + sc.fy*1.1); ctx.lineTo(sc.x + ux*(hw-0.6) + sc.fx*1.1, sc.y + uy*(hw-0.6) + sc.fy*1.1); ctx.stroke();
+}
+function drawRoute(){
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  route.forEach(function(pts){
+    if (pts.length < 2) return;
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (var k = 2; k < pts.length; k += 2){ var m = pts[k-1]; ctx.quadraticCurveTo(m.x, m.y, (m.x + pts[k].x)/2, (m.y + pts[k].y)/2); }
+    ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+    ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2.6; ctx.stroke();
+    ctx.strokeStyle = "#2F5FA8"; ctx.lineWidth = 1.3; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+  });
+  underpasses.forEach(function(u){
+    var i = u.i; ctx.save(); ctx.translate(xs[i], ys[i]); ctx.rotate(Math.atan2(tys[i], txs[i]) + Math.PI/2);
+    ctx.fillStyle = "#2F5FA8"; ctx.strokeStyle = INK; ctx.lineWidth = 0.4; ctx.fillRect(-1.6, -9, 3.2, 18); ctx.strokeRect(-1.6, -9, 3.2, 18);
+    ctx.restore();
+  });
+}
+function drawGates(){
+  if (!state.race) return;
+  order.forEach(function(w){
+    if (!w.peak || w.h < 0.3) return;
+    var a = anchor(w), x = a.x + w.dir.x*5, y = a.y + w.dir.y*5, px = -w.dir.y, py = w.dir.x;
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(x - px*3, y - py*3); ctx.lineTo(x + px*3, y + py*3); ctx.stroke();
+    ctx.fillStyle = "#C8322B"; [-3, 3].forEach(function(o){ ctx.beginPath(); ctx.arc(x + px*o, y + py*o, 0.9, 0, Math.PI*2); ctx.fill(); ctx.stroke(); });
+  });
+}
+function drawBarrier(w){
+  if (!state.race || w.crest.length < 2) return;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath(); w.crest.forEach(function(p, k){ if (k && Math.hypot(p.x - w.crest[k-1].x, p.y - w.crest[k-1].y) < 4.5) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+  ctx.strokeStyle = INK; ctx.lineWidth = 1.6; ctx.stroke(); ctx.strokeStyle = "#F3E3BC"; ctx.lineWidth = 0.8; ctx.stroke();
+  for (var k = 0; k < w.crest.length; k += 4){ var p = w.crest[k]; ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(p.x, p.y, 0.55, 0, Math.PI*2); ctx.fill(); }
+  // crowd on the track side of the barrier
+  var shirts = ["#F2B95B","#EFEAD8","#E98B7A","#9CC9E8","#C7A2E0"];
+  for (var n = 0; n < w.crest.length; n += 3){
+    var c = w.crest[n], back = 2.5 + (n % 9)/3*2.2, px = c.x - w.dir.x*back, py = c.y - w.dir.y*back;
+    var jump = w.cheer && !reduced ? Math.abs(Math.sin(now*9 + n*1.3))*1.1 : 0;
+    person(px, py - jump, shirts[n % shirts.length]);
+  }
 }
 function drawBridge(b, bi){
-  var P = mounds[b.a], Q = mounds[b.b], x1 = P.x, y1 = P.y - P.h*K, x2 = Q.x, y2 = Q.y - Q.h*K;
-  var L = Math.hypot(Q.x-P.x, Q.y-P.y), n = Math.max(2, Math.round(L/16)), ok = b.clear === null || b.clear >= CFG.minClear;
+  var P = b.P, Q = b.Q, ok = b.clear === null || b.clear >= CFG.minClear, L = Math.hypot(Q.x-P.x, Q.y-P.y), n = Math.max(2, Math.round(L/16));
   ctx.strokeStyle = "rgba(50,40,20,0.16)"; ctx.lineWidth = 3.2; ctx.lineCap = "round";
   ctx.beginPath(); ctx.moveTo(P.x + 3, P.y + 2); ctx.lineTo(Q.x + 3, Q.y + 2); ctx.stroke();
   for (var k = 1; k < n; k++){
-    var u = k/n, gx = P.x + (Q.x-P.x)*u, gy = P.y + (Q.y-P.y)*u, z = P.h + (Q.h-P.h)*u, gz = Math.max(0, sample(T, gx, gy));
-    if (sample(trackD, gx, gy) < 8.5 || mounds.some(function(m){ return footD(m, gx, gy) < 0.85; })) continue;
-    ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(gx, gy - gz*K); ctx.lineTo(gx, gy - z*K); ctx.stroke();
-    ctx.strokeStyle = "#C9B08A"; ctx.lineWidth = 0.8; ctx.stroke();
+    var u = k/n, gx = P.x + (Q.x-P.x)*u, gy = P.y + (Q.y-P.y)*u;
+    if (sample(nearD, gx, gy) < 8.5 || sample(T, gx, gy) > 0.5) continue;
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(gx, gy, 1.1, 0, Math.PI*2); ctx.fill();
   }
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+  ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(Q.x, Q.y);
   ctx.strokeStyle = INK; ctx.lineWidth = 4.4; ctx.stroke();
   ctx.strokeStyle = ok ? "#E9D3A6" : "#F2A28F"; ctx.lineWidth = 3.0; ctx.stroke();
   ctx.setLineDash([1.2,1.2]); ctx.strokeStyle = ok ? "#BE9A64" : "#C9533F"; ctx.lineWidth = 0.5; ctx.stroke(); ctx.setLineDash([]);
   [0, 1].forEach(function(k){
     var u = 0.5 + 0.42*Math.sin(now*(reduced ? 0.08 : 0.22) + bi*2.1 + k*Math.PI);
-    person(x1 + (x2-x1)*u, y1 + (y2-y1)*u - 0.6, k ? "#9CC9E8" : "#F2B95B");
+    person(P.x + (Q.x-P.x)*u, P.y + (Q.y-P.y)*u, k ? "#9CC9E8" : "#F2B95B");
   });
+}
+function drawBalloons(){
+  if (!state.race || balloonPath.length < 2) return;
+  ctx.setLineDash([2.5, 2.5]); ctx.strokeStyle = "rgba(74,58,44,0.45)"; ctx.lineWidth = 0.7;
+  ctx.beginPath(); balloonPath.forEach(function(p, k){ if (k) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); }); ctx.stroke(); ctx.setLineDash([]);
+  var cols = ["#E2694E","#F6C945","#4F8FCB","#E98BB8"], acc = 0, spacing = 26, idx = 0;
+  for (var k = 1; k < balloonPath.length; k++){
+    var A = balloonPath[k-1], B = balloonPath[k], L = Math.hypot(B.x-A.x, B.y-A.y);
+    for (var d = spacing - acc; d < L; d += spacing){
+      var u = d/L, x = A.x + (B.x-A.x)*u, y = A.y + (B.y-A.y)*u, bob = reduced ? 0 : Math.sin(now*1.6 + idx)*1.2;
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.3; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 1.5, y - 5, x, y - 9 + bob); ctx.stroke();
+      ctx.fillStyle = cols[idx % 4]; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.ellipse(x, y - 12 + bob, 2.6, 3.2, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.beginPath(); ctx.ellipse(x - 0.9, y - 13.2 + bob, 0.7, 1.0, -0.4, 0, Math.PI*2); ctx.fill();
+      idx++;
+    }
+    acc = (acc + L) % spacing;
+  }
 }
 function drawPond(p){
   ctx.fillStyle = "#C3A271"; ctx.strokeStyle = INK; ctx.lineWidth = 0.8;
@@ -630,14 +894,11 @@ function drawPond(p){
       var a = c*1.05 + p.x*0.01, cx = p.x + Math.cos(a)*p.a*0.25, cy = p.y + Math.sin(a)*p.b*0.25;
       ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a)*p.a*0.3, cy + Math.sin(a+0.4)*p.b*0.3); ctx.lineTo(cx + Math.cos(a-0.3)*p.a*0.5, cy + Math.sin(a)*p.b*0.48);
     }
-    ctx.stroke();
-    return;
+    ctx.stroke(); return;
   }
   var f = Math.sqrt(p.level)*0.95;
   ctx.fillStyle = "rgba(92,159,209,0.93)"; ctx.strokeStyle = "#3F7FB0"; ctx.lineWidth = 0.7;
   ctx.beginPath(); ctx.ellipse(p.x, p.y + 0.8, p.a*0.9*f, p.b*0.86*f, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 0.6;
-  ctx.beginPath(); ctx.ellipse(p.x - p.a*0.25*f, p.y - p.b*0.3*f, p.a*0.3*f, p.b*0.18*f, 0, Math.PI*1.1, Math.PI*1.8); ctx.stroke();
   p.ripples.forEach(function(rp){
     ctx.strokeStyle = "rgba(255,255,255," + (0.6*(1-rp.t)) + ")"; ctx.lineWidth = 0.4;
     ctx.beginPath(); ctx.ellipse(rp.x, rp.y, 0.5 + rp.t*3, 0.3 + rp.t*1.8, 0, 0, Math.PI*2); ctx.stroke();
@@ -645,29 +906,24 @@ function drawPond(p){
 }
 function drawTrackVis(){
   ctx.lineCap = "round"; ctx.lineJoin = "round";
-  mounds.forEach(function(m, mi){
-    var off = (mi - 1.5)*2.6, pen = false;
+  var n = waves.length;
+  waves.forEach(function(w, mi){
+    var off = (mi - (n-1)/2)*1.7, pen = false;
     ctx.beginPath();
     for (var i = 0; i < N; i += 2){
-      if (m.vis[i]){ var x = xs[i] + nx[i]*off, y = ys[i] + ny[i]*off; if (pen) ctx.lineTo(x,y); else ctx.moveTo(x,y); pen = true; }
+      if (w.vis[i]){ var x = xs[i] + nx[i]*off, y = ys[i] + ny[i]*off; if (pen) ctx.lineTo(x,y); else ctx.moveTo(x,y); pen = true; }
       else pen = false;
     }
-    ctx.globalAlpha = mi === state.focus ? 0.95 : 0.6; ctx.strokeStyle = m.color; ctx.lineWidth = 2.1; ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.globalAlpha = mi === state.focus ? 0.95 : 0.5; ctx.strokeStyle = w.color; ctx.lineWidth = mi === state.focus ? 1.9 : 1.4; ctx.stroke(); ctx.globalAlpha = 1;
   });
 }
 function drawRays(){
-  var m = mounds[state.focus], ex = m.x, ey = m.y - (m.h + CFG.eye)*K;
-  ctx.strokeStyle = m.color; ctx.lineWidth = 0.45; ctx.globalAlpha = 0.3;
+  var w = waves[state.focus]; if (!w || !w.eye) return;
+  ctx.strokeStyle = w.color; ctx.lineWidth = 0.45; ctx.globalAlpha = 0.3;
   ctx.beginPath();
-  for (var k = 0; k < visIdx.length; k += 2){ var i = visIdx[k]; if (m.vis[i]){ ctx.moveTo(ex, ey); ctx.lineTo(xs[i], ys[i]); } }
+  for (var k = 0; k < visIdx.length; k += 2){ var i = visIdx[k]; if (w.vis[i]){ ctx.moveTo(w.eye.x, w.eye.y); ctx.lineTo(xs[i], ys[i]); } }
   ctx.stroke(); ctx.globalAlpha = 1;
-  ctx.fillStyle = m.color; ctx.strokeStyle = INK; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(ex, ey, 1.6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-}
-function drawMemAxis(){
-  var ez = (sample(T, MEM.ax, MEM.ay) + CFG.eye)*K;
-  ctx.setLineDash([3,2.5]); ctx.strokeStyle = MEM.sees ? INK : "#B23A2A"; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.75;
-  ctx.beginPath(); ctx.moveTo(MEM.ax, MEM.ay - ez); ctx.lineTo(drama.x, drama.y); ctx.stroke();
-  ctx.setLineDash([]); ctx.globalAlpha = 1;
+  ctx.fillStyle = w.color; ctx.strokeStyle = INK; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(w.eye.x, w.eye.y, 1.8, 0, Math.PI*2); ctx.fill(); ctx.stroke();
 }
 function drawCar(c){
   var i = Math.floor(c.s), f = c.s - i, j = Math.min(N-1, i+1);
@@ -683,7 +939,7 @@ function drawCar(c){
   ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
   ctx.fillStyle = "rgba(30,25,20,0.22)"; ctx.beginPath(); ctx.ellipse(0.6, 1.2, 6.2, 2.6, 0, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = "#2B2522";
-  [[-3.6,-2.5],[-3.6,1.1],[3.0,-2.3],[3.0,1.1]].forEach(function(w){ ctx.fillRect(w[0]-1.2, w[1], 2.4, 1.4); });
+  [[-3.6,-2.5],[-3.6,1.1],[3.0,-2.3],[3.0,1.1]].forEach(function(wh){ ctx.fillRect(wh[0]-1.2, wh[1], 2.4, 1.4); });
   ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 0.4;
   ctx.beginPath(); ctx.moveTo(-5.2,-1.4); ctx.lineTo(1.5,-1.1); ctx.lineTo(5.6,-0.45); ctx.lineTo(5.6,0.45); ctx.lineTo(1.5,1.1); ctx.lineTo(-5.2,1.4); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillRect(-6.2,-2.4,1.3,4.8); ctx.strokeRect(-6.2,-2.4,1.3,4.8);
@@ -692,45 +948,54 @@ function drawCar(c){
   ctx.fillStyle = "#F6D35B"; ctx.beginPath(); ctx.arc(-0.6, 0, 0.55, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
+function drawRings(){
+  ctx.lineWidth = 0.5;
+  rings.forEach(function(r){
+    ctx.strokeStyle = "rgba(255,255,255," + (0.55*(1 - r.t)) + ")";
+    ctx.beginPath(); ctx.arc(r.x, r.y, 2 + r.t*34, 0, Math.PI*2); ctx.stroke();
+  });
+}
 function drawParticles(){
   ctx.lineCap = "round";
   ctx.strokeStyle = "#3F86C4"; ctx.lineWidth = 0.8; ctx.beginPath();
-  parts.forEach(function(p){ var z = Math.max(0, sample(T, p.x, p.y))*K; ctx.moveTo(p.x, p.y - z); ctx.lineTo(p.x - p.vx*0.28, p.y - p.vy*0.28 - z); });
+  parts.forEach(function(p){ ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx*0.28, p.y - p.vy*0.28); });
   ctx.stroke();
   ctx.fillStyle = "#8CC8F0";
-  parts.forEach(function(p){ var z = Math.max(0, sample(T, p.x, p.y))*K; ctx.beginPath(); ctx.arc(p.x, p.y - z, 0.65, 0, Math.PI*2); ctx.fill(); });
+  parts.forEach(function(p){ ctx.beginPath(); ctx.arc(p.x, p.y, 0.65, 0, Math.PI*2); ctx.fill(); });
 }
 function haloText(text, x, y, font, color){
   ctx.font = font; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(255,248,232,0.92)"; ctx.lineJoin = "round"; ctx.strokeText(text, x, y);
   ctx.fillStyle = color || INK; ctx.fillText(text, x, y);
 }
-function sign(text, x, y, font){
-  ctx.font = font; var w = ctx.measureText(text).width, bw = w + 14, bh = 21, bx = x - bw/2, by = y - bh;
+function sign(text, x, y, font, dot){
+  ctx.font = font; var w = ctx.measureText(text).width, bw = w + 24, bh = 21, bx = x - bw/2, by = y - bh;
   ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, by + bh); ctx.lineTo(x, by + bh + 7); ctx.stroke();
   ctx.fillStyle = "#8C6440"; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 6); else ctx.rect(bx, by, bw, bh); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = PAPER; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, x, by + bh/2 + 1);
+  ctx.fillStyle = dot; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx + 9, by + bh/2, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = PAPER; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, x + 5, by + bh/2 + 1);
 }
 function drawLabels(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   var small = cssW < 560, f11 = (small ? 10 : 12) + "px";
   ponds.forEach(function(p){
     if (p.y + p.b > H - 4 || p.y + p.b < 6) return;
-    haloText(Math.round(p.level*100) + "% full", p.x*s, (p.y + p.b)*s + 9, "700 " + f11 + " Nunito, system-ui, sans-serif");
+    haloText(Math.round(p.level*100) + "% full", p.x*s, Math.min(p.y + p.b, ROAD_Y - 8)*s + 9, "700 " + f11 + " Nunito, system-ui, sans-serif");
   });
   haloText("Rail + expressway", 70*s, (ROAD_Y + 24)*s, "700 " + f11 + " Nunito, system-ui, sans-serif", "#5A4A3A");
   turns.forEach(function(t){
-    var x = (t.x + t.ox*20)*s, y = (t.y + t.oy*20)*s, r = small ? 9 : 11, isD = t === drama;
-    if (isD){ ctx.strokeStyle = "#D9483A"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI*2); ctx.stroke(); }
-    ctx.fillStyle = isD ? "#D9483A" : INK; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
-    ctx.font = "600 " + (small ? 9 : 11) + "px Fredoka, system-ui, sans-serif"; ctx.fillStyle = PAPER; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(t.name, x, y + 0.5);
+    var x = (t.x + t.ox*16)*s, y = (t.y + t.oy*16)*s, r = small ? 8 : 10;
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+    ctx.font = "600 " + (small ? 9 : 10) + "px Fredoka, system-ui, sans-serif"; ctx.fillStyle = PAPER; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(t.name, x, y + 0.5);
   });
-  var mz = (sample(T, MEM.ax, MEM.ay))*K;
-  haloText("Memorial", (MEM.ax + MEM.dx*10)*s, (MEM.ay + MEM.dy*10 - mz)*s + 12, "700 " + f11 + " Nunito, system-ui, sans-serif");
-  mounds.forEach(function(m){ sign(m.id + " · " + fmtH(m.h) + " m", m.x*s, (m.y - m.h*K - 11)*s - 4, "600 " + (small ? 11 : 13) + "px Fredoka, system-ui, sans-serif"); });
+  if (underpasses.length){ var up0 = underpasses[0]; haloText("underpass", (xs[up0.i] - nx[up0.i]*16)*s, (ys[up0.i] - ny[up0.i]*16)*s, "700 " + f11 + " Nunito, system-ui, sans-serif", "#2F5FA8"); }
+  if (state.race) stands.forEach(function(st){ haloText(fmtN(st.seats) + " seats", (st.cx + st.sx*(st.D/2 + 6))*s, (st.cy + st.sy*(st.D/2 + 6))*s, "700 " + f11 + " Nunito, system-ui, sans-serif", "#9E3A24"); });
+  // stone edge tag on the biggest wave
+  var big = waves.reduce(function(b, w){ return !b || w.h > b.h ? w : b; }, null);
+  if (big && big.edgePt){ var se = big.edgePt; haloText("stone edge", (se.x + big.dir.x*9)*s, (se.y + big.dir.y*9)*s, "700 " + f11 + " Nunito, system-ui, sans-serif"); }
+  waves.forEach(function(w){ if (!w.eye || w.h < 0.3) return; var a = anchor(w); sign(w.name + " · " + fmtH(w.h) + " m", a.x*s, a.y*s - 10, "600 " + (small ? 11 : 12) + "px Fredoka, system-ui, sans-serif", w.color); });
   var lead = cars[0];
-  if (lead.x !== undefined && inWorld(lead.x, lead.y, 6)) haloText(Math.round(vel[Math.floor(lead.s)]*3.6) + " km/h", lead.x*s, lead.y*s - 16, "700 " + f11 + " Nunito, system-ui, sans-serif", "#A3321F");
-  // north arrow (north is to the right on this board)
+  if (lead.x !== undefined && inWorld(lead.x, lead.y, 6)) haloText(Math.round(vel[Math.floor(lead.s)]*3.6) + " km/h", lead.x*s, lead.y*s - 14, "700 " + f11 + " Nunito, system-ui, sans-serif", "#A3321F");
   var nxp = cssW - 30, nyp = 28;
   ctx.fillStyle = PAPER; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(nxp, nyp, 16, 0, Math.PI*2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = INK; ctx.beginPath(); ctx.moveTo(nxp + 11, nyp); ctx.lineTo(nxp - 2, nyp - 6); ctx.lineTo(nxp - 2, nyp + 6); ctx.closePath(); ctx.fill();
@@ -748,8 +1013,8 @@ function drawRain(){
 }
 
 /* ---------------- simulation ---------------- */
-var cars = [ { s: 0, color: "#D8442E", trail: [] }, { s: Math.floor(N*0.5), color: "#2E7FC1", trail: [] } ];
-var parts = [], spawnAcc = 0, collected = 0, rainAmt = 0, now = 0, last = 0, statT = 0, PLAY = reduced ? 0.4 : 1;
+var cars = [ { s: 0, color: "#D8442E", trail: [], emit: 0 }, { s: Math.floor(N*0.5), color: "#2E7FC1", trail: [], emit: 0 } ];
+var parts = [], rings = [], spawnAcc = 0, collected = 0, rainAmt = 0, now = 0, last = 0, statT = 0, PLAY = reduced ? 0.4 : 1;
 function grad(g, x, y){ return [ (sample(g, x+1, y) - sample(g, x-1, y))/2, (sample(g, x, y+1) - sample(g, x, y-1))/2 ]; }
 function pondHit(x, y){ for (var i = 0; i < ponds.length; i++) if (pondD(ponds[i], x, y) < 0.82) return i; return -1; }
 function fillPond(p, x, y, amount){ p.level = Math.min(1, p.level + amount/(p.a*p.b)); if (p.ripples.length < 8) p.ripples.push({ x:x, y:y, t:0 }); }
@@ -761,16 +1026,20 @@ function spawn(){
 }
 function update(dt){
   cars.forEach(function(c){
-    c.s += vel[Math.floor(c.s)]*dt*PLAY;
+    var v = vel[Math.floor(c.s)];
+    c.s += v*dt*PLAY;
     if (c.s >= N - 2){ c.s = 0; c.trail = []; }
     var j = Math.floor(c.s); c.trail.push([xs[j], ys[j]]); if (c.trail.length > 16) c.trail.shift();
+    c.emit += dt;
+    if (state.sound && !reduced && c.emit > 0.11 && inWorld(xs[j], ys[j], -20)){ c.emit = 0; if (rings.length < 120) rings.push({ x:xs[j], y:ys[j], t:0 }); }
   });
-  mounds.forEach(function(m){ m.cheer = cars.some(function(c){ return m.vis[Math.floor(c.s)] === 1; }); });
+  for (var r = rings.length - 1; r >= 0; r--){ rings[r].t += dt*0.9; if (rings[r].t >= 1) rings.splice(r, 1); }
+  waves.forEach(function(w){ w.cheer = cars.some(function(c){ return w.vis[Math.floor(c.s)] === 1; }); });
   rainAmt += ((state.wet ? 1 : 0) - rainAmt)*Math.min(1, dt*1.6);
   ponds.forEach(function(p){
     if (state.wet) p.level = Math.min(1, p.level + 0.012*dt);
     else p.level = Math.max(0, p.level - 0.05*dt);
-    for (var r = p.ripples.length - 1; r >= 0; r--){ p.ripples[r].t += dt*1.4; if (p.ripples[r].t >= 1) p.ripples.splice(r, 1); }
+    for (var q = p.ripples.length - 1; q >= 0; q--){ p.ripples[q].t += dt*1.4; if (p.ripples[q].t >= 1) p.ripples.splice(q, 1); }
   });
   if (state.wet){ spawnAcc += dt*(reduced ? 60 : 170); while (spawnAcc > 1){ spawnAcc--; spawn(); } }
   var fric = Math.exp(-1.3*dt);
@@ -781,7 +1050,7 @@ function update(dt){
     p.slow = Math.hypot(p.vx, p.vy) < 0.5 ? p.slow + dt : 0;
     var hit = pondHit(p.x, p.y), dead = false;
     if (hit >= 0){ fillPond(ponds[hit], p.x, p.y, 2.2); collected += 8; dead = true; }
-    else if (Math.hypot(p.x - MEM.ax, p.y - MEM.ay) < 3){ collected += 8; dead = true; }
+    else if (sample(nearD, p.x, p.y) < CFG.edge + 0.8){ collected += 8; dead = true; }
     else if (p.age > 16 || p.slow > 2.4 || p.x < 0 || p.y < 0 || p.x > W || p.y > ROAD_Y) dead = true;
     if (dead){ parts[n] = parts[parts.length - 1]; parts.pop(); }
   }
@@ -789,17 +1058,24 @@ function update(dt){
   statT += dt; if (statT > 0.25){ statT = 0; waterVal.textContent = fmtN(collected); }
 }
 function draw(){
+  if (terrainDirty) buildTerrain();
   ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0, 0, cv.width, cv.height);
   if (groundL) ctx.drawImage(groundL, 0, 0);
   ctx.setTransform(dpr*s,0,0,dpr*s,0,0);
   ponds.forEach(drawPond);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(terrC, 0, 0, W, ROAD_Y);
+  drawRoute();
   if (state.sight) drawTrackVis();
-  mounds.map(function(m, i){ return [m, i]; }).sort(function(a, b){ return a[0].y - b[0].y; }).forEach(function(q){ drawMound(q[0], q[1]); });
+  if (state.sound) drawRings();
+  waves.forEach(drawBarrier);
   if (parts.length) drawParticles();
   cars.forEach(drawCar);
-  bridges.forEach(drawBridge);
   if (state.trees && treeL){ ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(treeL, 0, 0); ctx.setTransform(dpr*s,0,0,dpr*s,0,0); }
-  drawMemAxis();
+  waves.forEach(drawFlat);
+  screens.forEach(drawScreen);
+  drawGates();
+  bridges.forEach(drawBridge);
+  drawBalloons();
   if (state.sight) drawRays();
   if (rainAmt > 0.01) drawRain();
   drawLabels();
@@ -812,20 +1088,20 @@ function frame(t){
   requestAnimationFrame(frame);
 }
 
-/* ---------------- canvas click: pick a hill ---------------- */
+/* ---------------- canvas click: pick a wave ---------------- */
 cv.addEventListener("click", function(e){
-  var rect = cv.getBoundingClientRect(), wx = (e.clientX - rect.left)/s, wy = (e.clientY - rect.top)/s, best = -1, bd = 1.15;
-  mounds.forEach(function(m, i){
-    [0, m.h*K*0.6].forEach(function(lift){
-      var d = footD(m, wx, wy + lift);
-      if (d < bd){ bd = d; best = i; }
-    });
+  var rect = cv.getBoundingClientRect(), wx = (e.clientX - rect.left)/s, wy = (e.clientY - rect.top)/s, best = -1, bd = 1e9;
+  var k = nearestCell(wx, wy);
+  waves.forEach(function(w, i){
+    if (waveH(w, k, w.h) > 0.05){ var a = anchor(w), d = Math.hypot(a.x - wx, a.y - wy); if (d < bd){ bd = d; best = i; } }
   });
+  if (best < 0) waves.forEach(function(w, i){ var a = anchor(w), d = Math.hypot(a.x - wx, a.y - wy); if (d < 30 && d < bd){ bd = d; best = i; } });
   if (best >= 0) setFocus(best);
 });
 
 /* ---------------- boot ---------------- */
-setFocus(0); refresh(); resize();
+var startFocus = waves.reduce(function(b, w, i){ return b < 0 || w.turn.drop > waves[b].turn.drop ? i : b; }, -1);
+setFocus(Math.max(0, startFocus)); setDay(true); resize();
 if (window.ResizeObserver) new ResizeObserver(function(){ if (cv.parentElement.clientWidth !== cssW) resize(); }).observe(cv.parentElement);
 else window.addEventListener("resize", resize);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ draw(); });
